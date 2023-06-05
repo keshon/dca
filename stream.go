@@ -99,15 +99,15 @@ func (s *StreamingSession) readNext() error {
 		return err
 	}
 
-	// Timeout after 100ms (Maybe this needs to be changed?)
-	timeOut := time.NewTimer(time.Second)
+	// Timeout after 5 seconds
+	timeOut := time.NewTimer(time.Second * 5)
+	defer timeOut.Stop()
 
 	// This will attempt to send on the channel before the timeout, which is 1s
 	select {
 	case <-timeOut.C:
 		return ErrVoiceConnClosed
 	case s.vc.OpusSend <- opus:
-		timeOut.Stop()
 	}
 
 	s.Lock()

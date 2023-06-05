@@ -13,6 +13,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,6 +33,10 @@ var (
 
 var (
 	ErrBadFrame = errors.New("Bad Frame")
+)
+
+var (
+	reTrimffmpegStatsLine = regexp.MustCompile(`=\s+`)
 )
 
 // EncodeOptions is a set of options for encoding dca
@@ -125,6 +130,7 @@ type EncodeSession struct {
 	options    *EncodeOptions
 	pipeReader io.Reader
 	filePath   string
+	isURL      bool
 
 	running      bool
 	started      time.Time
@@ -152,6 +158,7 @@ func EncodeMem(r io.Reader, options *EncodeOptions) (session *EncodeSession, err
 	session = &EncodeSession{
 		options:      options,
 		pipeReader:   r,
+		isURL:        false,
 		frameChannel: make(chan *Frame, options.BufferedFrames),
 	}
 	go session.run()
@@ -168,6 +175,7 @@ func EncodeFile(path string, options *EncodeOptions) (session *EncodeSession, er
 	session = &EncodeSession{
 		options:      options,
 		filePath:     path,
+		isURL:        strings.HasPrefix(path, "http"),
 		frameChannel: make(chan *Frame, options.BufferedFrames),
 	}
 	go session.run()
@@ -203,16 +211,12 @@ func (e *EncodeSession) run() {
 	args := []string{
 		"-stats",
 		"-i", inFile,
-		"-reconnect", "1",
-		"-reconnect_at_eof", "1",
-		"-reconnect_streamed", "1",
-		"-reconnect_delay_max", "2",
+		"-vn",
 		"-map", "0:a",
 		"-acodec", "libopus",
 		"-f", "ogg",
 		"-vbr", vbrStr,
 		"-compression_level", strconv.Itoa(e.options.CompressionLevel),
-		"-vol", strconv.Itoa(e.options.Volume),
 		"-ar", strconv.Itoa(e.options.FrameRate),
 		"-ac", strconv.Itoa(e.options.Channels),
 		"-b:a", strconv.Itoa(e.options.Bitrate * 1000),
@@ -223,10 +227,26 @@ func (e *EncodeSession) run() {
 		"-ss", strconv.Itoa(e.options.StartTime),
 	}
 
+	// Only add reconnect args if we're streaming from a URL
+	if e.isURL {
+		reconnectArgs := []string{
+			"-reconnect", "1",
+			"-reconnect_on_network_error", "1",
+			"-reconnect_on_http_error", "1",
+			"-reconnect_streamed", "1",
+			"-reconnect_delay_max", "5",
+		}
+		args = append(args, reconnectArgs...)
+	}
+
+	filters := []string{
+		fmt.Sprintf("volume=%d", e.options.Volume),
+	}
 	if e.options.AudioFilter != "" {
 		// Lit af
-		args = append(args, "-af", e.options.AudioFilter)
+		filters = append(filters, e.options.AudioFilter)
 	}
+	args = append(args, "-af", strings.Join(filters, ","))
 
 	args = append(args, "pipe:1")
 
@@ -465,6 +485,12 @@ func (e *EncodeSession) handleStderrLine(line string) {
 	if strings.Index(line, "size=") != 0 {
 		return // Not stats info
 	}
+	// Handle speed not being set yet
+	if strings.Contains(line, "speed=N/A") {
+		return
+	}
+
+	line = reTrimffmpegStatsLine.ReplaceAllString(line, "=")
 
 	var size int
 
