@@ -2,10 +2,11 @@ package dca
 
 import (
 	"errors"
-	"github.com/bwmarrin/discordgo"
 	"io"
 	"sync"
 	"time"
+
+	"github.com/bwmarrin/discordgo"
 )
 
 var (
@@ -99,8 +100,8 @@ func (s *StreamingSession) readNext() error {
 		return err
 	}
 
-	// Timeout after 5 seconds
-	timeOut := time.NewTimer(time.Second * 5)
+	// Timeout after 1 minute
+	timeOut := time.NewTimer(time.Minute * 1)
 	defer timeOut.Stop()
 
 	// This will attempt to send on the channel before the timeout, which is 1s
