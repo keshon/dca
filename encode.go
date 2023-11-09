@@ -55,6 +55,7 @@ type EncodeOptions struct {
 	VBR              bool             // Wether vbr is used or not (variable bitrate)
 	Threads          int              // Number of threads to use, 0 for auto
 	StartTime        int              // Start Time of the input stream in seconds
+	VolumeFloat      float32          // change audio volume (1.0=normal)
 
 	// The ffmpeg audio filters to use, see https://ffmpeg.org/ffmpeg-filters.html#Audio-Filters for more info
 	// Leave empty to use no filters.
@@ -110,6 +111,7 @@ var StdEncodeOptions = &EncodeOptions{
 	BufferedFrames:   100, // At 20ms frames that's 2s
 	VBR:              true,
 	StartTime:        0,
+	VolumeFloat:      0.0,
 }
 
 // EncodeStats is transcode stats reported by ffmpeg
@@ -239,8 +241,12 @@ func (e *EncodeSession) run() {
 		args = append(args, reconnectArgs...)
 	}
 
-	filters := []string{
-		fmt.Sprintf("volume=%d", e.options.Volume),
+	var filters []string
+	// If using the new VolumeFloat option, use that instead of the old Volume option.
+	if e.options.VolumeFloat == 0.0 {
+		filters = []string{fmt.Sprintf("volume=%d", e.options.Volume)}
+	} else {
+		filters = []string{fmt.Sprintf(`volume=%.2f`, e.options.VolumeFloat/10)}
 	}
 	if e.options.AudioFilter != "" {
 		// Lit af
@@ -252,7 +258,7 @@ func (e *EncodeSession) run() {
 
 	ffmpeg := exec.Command("ffmpeg", args...)
 
-	// logln(ffmpeg.Args)
+	logln(ffmpeg.Args)
 
 	if e.pipeReader != nil {
 		ffmpeg.Stdin = e.pipeReader
