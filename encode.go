@@ -258,7 +258,7 @@ func (e *EncodeSession) run() {
 
 	ffmpeg := exec.Command("ffmpeg", args...)
 
-	logln(ffmpeg.Args)
+	// logln(ffmpeg.Args)
 
 	if e.pipeReader != nil {
 		ffmpeg.Stdin = e.pipeReader
