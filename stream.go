@@ -29,7 +29,7 @@ type StreamingSession struct {
 
 	finished bool
 	running  bool
-	err      error // If an error occured and we had to stop
+	err      error // If an error occurred and we had to stop
 }
 
 // Creates a new stream from an Opusreader.

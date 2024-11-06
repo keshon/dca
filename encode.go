@@ -209,7 +209,7 @@ func (e *EncodeSession) run() {
 		vbrStr = "off"
 	}
 
-	// Launch ffmpeg with a variety of different fruits and goodies mixed togheter
+	// Launch ffmpeg with a variety of different fruits and goodies mixed together
 	args := []string{
 		"-stats",
 		"-i", inFile,
@@ -629,7 +629,7 @@ func (e *EncodeSession) Running() (running bool) {
 
 // Stats returns ffmpeg stats, NOTE: this is not playback stats but transcode stats.
 // To get how far into playback you are
-// you have to track the number of frames sent to discord youself
+// you have to track the number of frames sent to discord yourself
 func (e *EncodeSession) Stats() *EncodeStats {
 	s := &EncodeStats{}
 	e.Lock()
@@ -665,7 +665,7 @@ func (e *EncodeSession) Cleanup() {
 }
 
 // Read implements io.Reader,
-// n == len(p) if err == nil, otherwise n contains the number bytes read before an error occured
+// n == len(p) if err == nil, otherwise n contains the number bytes read before an error occurred
 func (e *EncodeSession) Read(p []byte) (n int, err error) {
 	if e.buf.Len() >= len(p) {
 		return e.buf.Read(p)
@@ -687,7 +687,7 @@ func (e *EncodeSession) FrameDuration() time.Duration {
 	return time.Duration(e.options.FrameDuration) * time.Millisecond
 }
 
-// Error returns any error that occured during the encoding process
+// Error returns any error that occurred during the encoding process
 func (e *EncodeSession) Error() error {
 	e.Lock()
 	defer e.Unlock()
