@@ -39,6 +39,10 @@ var (
 	reTrimffmpegStatsLine = regexp.MustCompile(`=\s+`)
 )
 
+var (
+	encodingLineLog = false
+)
+
 // EncodeOptions is a set of options for encoding dca
 type EncodeOptions struct {
 	Volume                  int              // change audio volume (256=normal)
@@ -223,6 +227,10 @@ func (e *EncodeSession) run() {
 	vbrStr := "on"
 	if !e.options.VBR {
 		vbrStr = "off"
+	}
+
+	if e.options.EncodingLineLog {
+		encodingLineLog = e.options.EncodingLineLog
 	}
 
 	// Launch ffmpeg with a variety of different fruits and goodies mixed together
@@ -508,6 +516,10 @@ func (e *EncodeSession) readStderr(stderr io.ReadCloser, wg *sync.WaitGroup) {
 }
 
 func (e *EncodeSession) handleStderrLine(line string) {
+	if encodingLineLog {
+		logln("encoding: " + line)
+	}
+
 	if strings.Index(line, "size=") != 0 {
 		return // Not stats info
 	}
