@@ -41,21 +41,29 @@ var (
 
 // EncodeOptions is a set of options for encoding dca
 type EncodeOptions struct {
-	Volume           int              // change audio volume (256=normal)
-	Channels         int              // audio channels
-	FrameRate        int              // audio sampling rate (ex 48000)
-	FrameDuration    int              // audio frame duration can be 20, 40, or 60 (ms)
-	Bitrate          int              // audio encoding bitrate in kb/s can be 8 - 128
-	PacketLoss       int              // expected packet loss percentage
-	RawOutput        bool             // Raw opus output (no metadata or magic bytes)
-	Application      AudioApplication // Audio application
-	CoverFormat      string           // Format the cover art will be encoded with (ex "jpeg)
-	CompressionLevel int              // Compression level, higher is better qualiy but slower encoding (0 - 10)
-	BufferedFrames   int              // How big the frame buffer should be
-	VBR              bool             // Wether vbr is used or not (variable bitrate)
-	Threads          int              // Number of threads to use, 0 for auto
-	StartTime        time.Duration    // Start Time of the input stream in seconds
-	VolumeFloat      float32          // change audio volume (1.0=normal)
+	Volume                  int              // change audio volume (256=normal)
+	Channels                int              // audio channels
+	FrameRate               int              // audio sampling rate (ex 48000)
+	FrameDuration           int              // audio frame duration can be 20, 40, or 60 (ms)
+	Bitrate                 int              // audio encoding bitrate in kb/s can be 8 - 128
+	PacketLoss              int              // expected packet loss percentage
+	RawOutput               bool             // Raw opus output (no metadata or magic bytes)
+	Application             AudioApplication // Audio application
+	CoverFormat             string           // Format the cover art will be encoded with (ex "jpeg)
+	CompressionLevel        int              // Compression level, higher is better qualiy but slower encoding (0 - 10)
+	BufferedFrames          int              // How big the frame buffer should be
+	VBR                     bool             // Wether vbr is used or not (variable bitrate)
+	Threads                 int              // Number of threads to use, 0 for auto
+	StartTime               time.Duration    // Start Time of the input stream in seconds
+	VolumeFloat             float32          // change audio volume (1.0=normal)
+	ReconnectAtEOF          int              // If set then eof is treated like an error and causes reconnection, this is useful for live / endless streams.
+	ReconnectStreamed       int              // If set then even streamed/non seekable streams will be reconnected on errors.
+	ReconnectOnNetworkError int              // Reconnect automatically in case of TCP/TLS errors during connect.
+	ReconnectOnHttpError    string           // A comma separated list of HTTP status codes to reconnect on. The list can include specific status codes (e.g. ’503’) or the strings ’4xx’ / ’5xx’.
+	ReconnectDelayMax       int              // Sets the maximum delay in seconds after which to give up reconnecting
+	FfmpegBinaryPath        string           // Specify path to ffmpeg binary location
+	EncodingLineLog         bool             // Print encoding line one by one
+	UserAgent               string           // Override the User-Agent header.
 
 	// The ffmpeg audio filters to use, see https://ffmpeg.org/ffmpeg-filters.html#Audio-Filters for more info
 	// Leave empty to use no filters.
@@ -100,18 +108,26 @@ func (opts *EncodeOptions) Validate() error {
 
 // StdEncodeOptions is the standard options for encoding
 var StdEncodeOptions = &EncodeOptions{
-	Volume:           1.0,
-	Channels:         2,
-	FrameRate:        48000,
-	FrameDuration:    20,
-	Bitrate:          64,
-	Application:      AudioApplicationAudio,
-	CompressionLevel: 10,
-	PacketLoss:       1,
-	BufferedFrames:   100, // At 20ms frames that's 2s
-	VBR:              true,
-	StartTime:        0,
-	VolumeFloat:      0.0,
+	Volume:                  1.0,
+	Channels:                2,
+	FrameRate:               48000,
+	FrameDuration:           20,
+	Bitrate:                 64,
+	Application:             AudioApplicationAudio,
+	CompressionLevel:        10,
+	PacketLoss:              1,
+	BufferedFrames:          100, // At 20ms frames that's 2s
+	VBR:                     true,
+	StartTime:               0,
+	VolumeFloat:             0.0,
+	ReconnectAtEOF:          1,
+	ReconnectStreamed:       1,
+	ReconnectOnNetworkError: 1,
+	ReconnectOnHttpError:    "4xx,5xx",
+	ReconnectDelayMax:       5,
+	FfmpegBinaryPath:        "",
+	EncodingLineLog:         false,
+	UserAgent:               "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)",
 }
 
 // EncodeStats is transcode stats reported by ffmpeg
@@ -232,13 +248,13 @@ func (e *EncodeSession) run() {
 	// Only add reconnect args if we're streaming from a URL
 	if e.isURL {
 		reconnectArgs := []string{
-			"-reconnect", "1",
-			"-reconnect_on_network_error", "1",
-			"-reconnect_on_http_error", "1",
-			"-reconnect_streamed", "1",
-			"-reconnect_delay_max", "5",
+			"-reconnect_at_eof", strconv.Itoa(e.options.ReconnectAtEOF),
+			"-reconnect_on_network_error", strconv.Itoa(e.options.ReconnectOnNetworkError),
+			"-reconnect_on_http_error", string(e.options.ReconnectOnHttpError),
+			"-reconnect_streamed", strconv.Itoa(e.options.ReconnectStreamed),
+			"-reconnect_delay_max", strconv.Itoa(e.options.ReconnectDelayMax),
 		}
-		args = append(args, reconnectArgs...)
+		args = append(reconnectArgs, args...)
 	}
 
 	var filters []string
@@ -256,7 +272,11 @@ func (e *EncodeSession) run() {
 
 	args = append(args, "pipe:1")
 
-	ffmpeg := exec.Command("ffmpeg", args...)
+	ffmpegPath := e.options.FfmpegBinaryPath
+	if _, err := os.Stat(ffmpegPath); errors.Is(err, os.ErrNotExist) {
+		ffmpegPath = ""
+	}
+	ffmpeg := exec.Command(ffmpegPath+"ffmpeg", args...)
 
 	// logln(ffmpeg.Args)
 
