@@ -68,6 +68,7 @@ type EncodeOptions struct {
 	FfmpegBinaryPath        string           // Specify path to ffmpeg binary location
 	EncodingLineLog         bool             // Print encoding line one by one
 	UserAgent               string           // Override the User-Agent header.
+	HttpProxy               string           // Proxy address to use.
 
 	// The ffmpeg audio filters to use, see https://ffmpeg.org/ffmpeg-filters.html#Audio-Filters for more info
 	// Leave empty to use no filters.
@@ -132,6 +133,7 @@ var StdEncodeOptions = &EncodeOptions{
 	FfmpegBinaryPath:        "",
 	EncodingLineLog:         false,
 	UserAgent:               "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)",
+	HttpProxy:               "",
 }
 
 // EncodeStats is transcode stats reported by ffmpeg
@@ -263,6 +265,10 @@ func (e *EncodeSession) run() {
 			"-reconnect_delay_max", strconv.Itoa(e.options.ReconnectDelayMax),
 		}
 		args = append(reconnectArgs, args...)
+	}
+
+	if e.options.HttpProxy != "" && strings.HasPrefix(e.options.HttpProxy, "http") {
+		args = append(args, "-http_proxy", e.options.HttpProxy)
 	}
 
 	var filters []string
