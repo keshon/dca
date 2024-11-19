@@ -286,7 +286,7 @@ func (e *EncodeSession) run() {
 	}
 	ffmpeg := exec.Command(ffmpegPath+"ffmpeg", args...)
 
-	// logln(ffmpeg.Args)
+	logln(ffmpeg.Args)
 
 	if e.pipeReader != nil {
 		ffmpeg.Stdin = e.pipeReader
@@ -423,7 +423,11 @@ func (e *EncodeSession) writeMetadataFrame() {
 		cmdBuf.Reset()
 
 		// get cover art
-		cover := exec.Command("ffmpeg", "-loglevel", "0", "-i", e.filePath, "-f", "singlejpeg", "pipe:1")
+		ffmpegPath := e.options.FfmpegBinaryPath
+		if _, err := os.Stat(ffmpegPath); errors.Is(err, os.ErrNotExist) {
+			ffmpegPath = ""
+		}
+		cover := exec.Command(ffmpegPath+"ffmpeg", "-loglevel", "0", "-i", e.filePath, "-f", "singlejpeg", "pipe:1")
 		cover.Stdout = &cmdBuf
 
 		err = cover.Start()
